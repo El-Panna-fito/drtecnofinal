@@ -36,10 +36,30 @@ import { processChatQuery } from "./server/services/chat.service.js";
 validateEnv();
 
 const app = express();
+// Trust the reverse proxy (v0 preview / Vercel) so `req.secure` and `req.protocol`
+// reflect the original client protocol via the `x-forwarded-proto` header.
+app.set("trust proxy", 1);
 // Use the port provided by the hosting environment (Vercel, etc.) when set.
 // The v0 preview expects the dev server on 8080 and does NOT inject PORT,
 // so default to 8080 instead of 3000.
 const PORT = Number(process.env.PORT) || 8080;
+
+// Build session-cookie options that work both on plain localhost and inside the
+// cross-site HTTPS iframe used by the v0 preview. A cross-site iframe only sends
+// cookies marked `SameSite=None; Secure`; over HTTPS we must use those, otherwise
+// the browser drops the session cookie and every admin request 401s right after
+// login (the "enter the panel then instantly bounce back" symptom). On plain HTTP
+// localhost, `Secure` cookies are rejected, so fall back to `SameSite=Lax`.
+function sessionCookieOptions(req: Request) {
+  const isHttps = req.secure || req.headers["x-forwarded-proto"] === "https";
+  return {
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: (isHttps ? "none" : "lax") as "none" | "lax",
+    path: "/",
+    maxAge: 1000 * 60 * 60 * 12 // 12 hours
+  };
+}
 
 // Security Middlewares
 app.use(
@@ -549,14 +569,9 @@ app.post("/api/admin/login", authLimiter, async (req: Request, res: Response, ne
 
     const token = createSessionToken(verifiedUser.username, verifiedUser.role || "admin");
 
-    // Secure HttpOnly Cookie (Strict, HttpOnly, SameSite)
-    res.cookie("dr_tecno_session", token, {
-      httpOnly: true,
-      secure: env.isProduction,
-      sameSite: env.isProduction ? "strict" : "lax",
-      path: "/",
-      maxAge: 1000 * 60 * 60 * 12 // 12 hours
-    });
+    // HttpOnly session cookie. Attributes adapt to the request protocol so the
+    // cookie survives inside the cross-site HTTPS iframe used by the preview.
+    res.cookie("dr_tecno_session", token, sessionCookieOptions(req));
 
     // Log admin login event
     await db.createAdminAuditLog({
@@ -580,7 +595,8 @@ app.post("/api/admin/login", authLimiter, async (req: Request, res: Response, ne
 
 // Admin Logout
 app.post("/api/admin/logout", (req: Request, res: Response) => {
-  res.clearCookie("dr_tecno_session", { path: "/" });
+  const { maxAge, ...clearOpts } = sessionCookieOptions(req);
+  res.clearCookie("dr_tecno_session", clearOpts);
   res.json({ success: true, message: "Sesión cerrada correctamente" });
 });
 
@@ -594,7 +610,8 @@ app.get("/api/admin/session", (req: AuthenticatedRequest, res: Response) => {
 
   const session = verifySessionToken(token);
   if (!session) {
-    res.clearCookie("dr_tecno_session", { path: "/" });
+    const { maxAge, ...clearOpts } = sessionCookieOptions(req);
+    res.clearCookie("dr_tecno_session", clearOpts);
     return res.status(401).json({ success: false, error: { code: "SESSION_EXPIRED", message: "Sesión expirada" } });
   }
 
