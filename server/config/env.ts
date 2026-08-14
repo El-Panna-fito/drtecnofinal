@@ -66,7 +66,7 @@ function resolveAdminSecret(): string {
 
 export const env: EnvConfig = {
   NODE_ENV: (process.env.NODE_ENV as any) || "development",
-  PORT: 3000,
+  PORT: Number(process.env.PORT) || 3000,
   APP_URL: resolveAppUrl(),
   SUPABASE_URL: resolveSupabaseUrl(),
   SUPABASE_SERVICE_ROLE_KEY: resolveServiceRoleKey(),

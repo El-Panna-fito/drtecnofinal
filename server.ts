@@ -34,7 +34,9 @@ import { processChatQuery } from "./server/services/chat.service.js";
 validateEnv();
 
 const app = express();
-const PORT = 3000;
+// Use the port provided by the hosting environment (v0 preview, Vercel, etc.)
+// and fall back to 3000 for plain local development.
+const PORT = Number(process.env.PORT) || 3000;
 
 // Security Middlewares
 app.use(
@@ -933,7 +935,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 [Dr Tecno Production Server] listening on http://localhost:${PORT}`);
+    console.log(`[STARTUP] Server running on 0.0.0.0:${PORT}`);
   });
 }
 
