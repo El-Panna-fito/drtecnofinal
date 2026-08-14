@@ -1,0 +1,134 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700;800&family=Russo+One&family=Orbitron:wght@400;500;700;900&family=Roboto+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'Ode to Idle Gaming';
+  src: url('https://db.onlinewebfonts.com/t/2c7d91e847702a4bf732dfccb6d85ebf.woff2') format('woff2'),
+       url('https://db.onlinewebfonts.com/t/2c7d91e847702a4bf732dfccb6d85ebf.woff') format('woff'),
+       url('https://db.onlinewebfonts.com/t/2c7d91e847702a4bf732dfccb6d85ebf.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: "Gotham", "Montserrat", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Ode to Idle Gaming", "Russo One", "Orbitron", "Roboto Mono", monospace;
+  --font-mono: "Roboto Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-logo-pink: #ED4E9D;
+  --color-logo-yellow: #FFD028;
+  --color-logo-green: #37CE7F;
+  --color-logo-cyan: #17CBE0;
+
+  --color-background: oklch(0.10 0.01 240);
+  --color-foreground: oklch(0.97 0 0);
+  --color-card: oklch(0.15 0.01 240);
+  --color-primary: oklch(0.72 0.20 210);
+  --color-primary-foreground: oklch(0.10 0 0);
+  --color-accent: #17CBE0;
+  --color-accent-foreground: oklch(0.10 0 0);
+  --color-secondary: oklch(0.20 0.02 240);
+  --color-muted: oklch(0.22 0.01 240);
+  --color-muted-foreground: oklch(0.62 0.02 240);
+  --color-success: #37CE7F;
+  --color-destructive: #ED4E9D;
+  --color-border: oklch(0.25 0.02 240);
+
+  --radius-lg: 0.5rem;
+  --radius-md: calc(0.5rem - 2px);
+  --radius-sm: calc(0.5rem - 4px);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar to keep up with the dark tech theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-background);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted-foreground);
+  }
+
+  /* Smooth Focus ring */
+  *:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* Glass effect from Sleek Interface design */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Technological Grid/Overlay pattern background */
+.tech-bg {
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(184, 237, 248, 0.03) 0px, transparent 50%),
+    radial-gradient(at 50% 0%, rgba(121, 187, 255, 0.04) 0px, transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.003) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.003) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 30px 30px, 30px 30px;
+}
+
+/* Animations helper */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; filter: drop-shadow(0 0 4px var(--color-accent)); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s infinite ease-in-out;
+}
+
+/* Brand 4-Color Gradient Utilities based on the logo colors */
+.bg-logo-gradient {
+  background: linear-gradient(90deg, #ED4E9D 0%, #FFD028 33%, #37CE7F 66%, #17CBE0 100%);
+}
+
+.text-logo-gradient {
+  background: linear-gradient(90deg, #ED4E9D 0%, #FFD028 33%, #37CE7F 66%, #17CBE0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.border-logo-gradient {
+  position: relative;
+}
+
+.border-logo-gradient::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #ED4E9D 0%, #FFD028 33%, #37CE7F 66%, #17CBE0 100%);
+}
+
+.logo-glow:hover {
+  box-shadow: 0 0 15px rgba(23, 203, 224, 0.25), 0 0 3px rgba(237, 78, 157, 0.2);
+}
+
