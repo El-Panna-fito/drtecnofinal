@@ -5,7 +5,6 @@ import path from "path";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 
 import { env, validateEnv } from "./server/config/env.js";
@@ -944,6 +943,10 @@ async function startServer() {
   const httpServer = http.createServer(app);
 
   if (process.env.NODE_ENV !== "production") {
+    // Import Vite lazily so it is never pulled into the serverless/production
+    // bundle (Vite is a devDependency and would bloat or break the Vercel
+    // function). This branch only runs in local development.
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
