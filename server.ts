@@ -1,3 +1,4 @@
+// Dr Tecno production server entry point.
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import helmet from "helmet";
@@ -34,9 +35,10 @@ import { processChatQuery } from "./server/services/chat.service.js";
 validateEnv();
 
 const app = express();
-// Use the port provided by the hosting environment (v0 preview, Vercel, etc.)
-// and fall back to 3000 for plain local development.
-const PORT = Number(process.env.PORT) || 3000;
+// Use the port provided by the hosting environment (Vercel, etc.) when set.
+// The v0 preview expects the dev server on 8080 and does NOT inject PORT,
+// so default to 8080 instead of 3000.
+const PORT = Number(process.env.PORT) || 8080;
 
 // Security Middlewares
 app.use(
@@ -922,7 +924,16 @@ async function startServer() {
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        // The hosting platform re-syncs env files (.env.development.local) at
+        // runtime. Without ignoring them, Vite restarts the server on every
+        // sync, which collides with the still-bound port (EADDRINUSE) and can
+        // crash the process before the preview attaches.
+        watch: {
+          ignored: ["**/.env", "**/.env.*"]
+        }
+      },
       appType: "spa"
     });
     app.use(vite.middlewares);
