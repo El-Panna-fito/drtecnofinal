@@ -1,8 +1,13 @@
 import dotenv from "dotenv";
 import path from "path";
 
-// Load local environment files if present
+// Load local environment files if present.
+// Order matters: dotenv does NOT override variables already set in process.env,
+// so we load the most specific files first. `.env.development.local` is where
+// the hosting platform (v0 preview / Vercel) mirrors project + integration vars.
+dotenv.config({ path: path.resolve(process.cwd(), ".env.development.local") });
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+dotenv.config({ path: path.resolve(process.cwd(), ".env.development") });
 dotenv.config();
 
 const isProduction = process.env.NODE_ENV === "production";
