@@ -1,5 +1,6 @@
 // Dr Tecno production server entry point.
 import express, { Request, Response, NextFunction } from "express";
+import http from "http";
 import path from "path";
 import helmet from "helmet";
 import cors from "cors";
@@ -922,10 +923,22 @@ app.use(errorHandler);
 async function startServer() {
   await initDb();
 
+  // Explicit HTTP server so Vite's HMR websocket can share the same port.
+  const httpServer = http.createServer(app);
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
+        // Attach HMR to the shared HTTP server instead of Vite's default
+        // standalone ws port (24678), which the v0/Vercel proxy does not
+        // expose. `clientPort: 443` tells the browser to reach the HMR socket
+        // through the proxy over wss:443, fixing "WebSocket closed without
+        // opened". Falls back to the same port for plain local dev.
+        hmr: {
+          server: httpServer,
+          clientPort: Number(process.env.HMR_CLIENT_PORT) || 443
+        },
         // The hosting platform re-syncs env files (.env.development.local) at
         // runtime. Without ignoring them, Vite restarts the server on every
         // sync, which collides with the still-bound port (EADDRINUSE) and can
@@ -945,7 +958,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`[STARTUP] Server running on 0.0.0.0:${PORT}`);
   });
 }
