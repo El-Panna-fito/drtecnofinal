@@ -38,7 +38,30 @@ function resolveAppUrl(): string {
   return "http://localhost:3000";
 }
 
+// Extract the Supabase project ref from a service-role/anon JWT (`ref` claim).
+// Returns null for non-JWT keys (e.g. the new `sb_secret_...` format).
+function projectRefFromJwt(key?: string): string | null {
+  if (!key || !key.startsWith("eyJ")) return null;
+  try {
+    const payload = JSON.parse(
+      Buffer.from(key.split(".")[1], "base64").toString("utf8")
+    );
+    return typeof payload.ref === "string" ? payload.ref : null;
+  } catch {
+    return null;
+  }
+}
+
 function resolveSupabaseUrl(): string {
+  // The project's env vars contain URLs and keys from MORE THAN ONE Supabase
+  // project. If we pick a URL that doesn't match the key we authenticate with,
+  // Supabase returns "Invalid API key". To guarantee they match, derive the URL
+  // from the active service-role key's own `ref` claim whenever possible.
+  const ref = projectRefFromJwt(resolveServiceRoleKey());
+  if (ref) {
+    return `https://${ref}.supabase.co`;
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
     process.env.VITE_SUPABASE_URL ||
