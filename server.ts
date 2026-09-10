@@ -1,6 +1,7 @@
 // Dr Tecno production server entry point.
 import express, { Request, Response, NextFunction } from "express";
 import http from "http";
+import { execSync } from "child_process";
 import path from "path";
 import helmet from "helmet";
 import cors from "cors";
@@ -990,10 +991,37 @@ async function startServer() {
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 
-  // If the previous instance hasn't freed the port yet, retry a few times
-  // instead of throwing an unhandled 'error' event and crashing the process.
+  // When the preview supervisor relaunches the dev server, the previous
+  // instance can keep holding the port (it doesn't always receive a shutdown
+  // signal). If we merely retried, the stale process would keep serving OLD
+  // code and this newcomer would eventually give up. Instead, the newcomer
+  // TAKES OVER: on EADDRINUSE it kills whatever process is holding the port
+  // (never itself) and binds. Dev-only; production uses a single serverless
+  // invocation and never reaches this branch.
+  const killStalePortHolder = () => {
+    const self = process.pid;
+    try {
+      // `ss -ltnp` lists listening sockets with their owning pid.
+      const out = execSync(`ss -ltnp 'sport = :${PORT}' 2>/dev/null || true`, {
+        encoding: "utf8"
+      });
+      const pids = new Set<number>();
+      for (const m of out.matchAll(/pid=(\d+)/g)) {
+        const pid = Number(m[1]);
+        if (pid && pid !== self) pids.add(pid);
+      }
+      for (const pid of pids) {
+        console.warn(`[STARTUP] Killing stale process ${pid} holding port ${PORT}`);
+        try { process.kill(pid, "SIGKILL"); } catch { /* already gone */ }
+      }
+      return pids.size > 0;
+    } catch {
+      return false;
+    }
+  };
+
   let attempts = 0;
-  const MAX_ATTEMPTS = 10;
+  const MAX_ATTEMPTS = 15;
   const listen = () => {
     httpServer.listen(PORT, "0.0.0.0");
   };
@@ -1003,7 +1031,11 @@ async function startServer() {
   httpServer.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE" && attempts < MAX_ATTEMPTS) {
       attempts++;
-      console.warn(`[STARTUP] Port ${PORT} busy (attempt ${attempts}/${MAX_ATTEMPTS}); retrying in 500ms...`);
+      const killed = killStalePortHolder();
+      console.warn(
+        `[STARTUP] Port ${PORT} busy (attempt ${attempts}/${MAX_ATTEMPTS})` +
+          `${killed ? " — killed stale holder," : ","} retrying in 500ms...`
+      );
       setTimeout(listen, 500);
     } else {
       console.error(`[STARTUP] Failed to bind port ${PORT}:`, err.message);
