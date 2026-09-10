@@ -101,7 +101,14 @@ app.use(cookieParser(env.ADMIN_SESSION_SECRET));
 // on Vercel via OIDC). A plain gateway model id is used so no provider API key
 // is required — the previously configured Gemini key was denied project access.
 const AI_MODEL = "google/gemini-2.5-flash";
-const AI_ENABLED = !!(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN);
+// Always attempt AI. The AI SDK gateway auto-authenticates at request time via
+// AI_GATEWAY_API_KEY (preview) or VERCEL_OIDC_TOKEN (Vercel production). We must
+// NOT gate on those env vars at module load: VERCEL_OIDC_TOKEN is injected
+// per-invocation and is frequently absent during cold-start initialization,
+// which would wrongly disable AI for the whole warm function and make the bot
+// answer from the keyword fallback instead of with real context. Each AI call is
+// wrapped in try/catch and falls back gracefully if auth/generation fails.
+const AI_ENABLED = true;
 
 // ==================== PUBLIC API ROUTES ====================
 
