@@ -1,9 +1,11 @@
+// Dr Tecno production server entry point.
 import express, { Request, Response, NextFunction } from "express";
+import http from "http";
+import { execSync } from "child_process";
 import path from "path";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 
 import { env, validateEnv } from "./server/config/env.js";
@@ -34,7 +36,30 @@ import { processChatQuery } from "./server/services/chat.service.js";
 validateEnv();
 
 const app = express();
-const PORT = 3000;
+// Trust the reverse proxy (v0 preview / Vercel) so `req.secure` and `req.protocol`
+// reflect the original client protocol via the `x-forwarded-proto` header.
+app.set("trust proxy", 1);
+// Use the port provided by the hosting environment (Vercel, etc.) when set.
+// The v0 preview expects the dev server on 8080 and does NOT inject PORT,
+// so default to 8080 instead of 3000.
+const PORT = Number(process.env.PORT) || 8080;
+
+// Build session-cookie options that work both on plain localhost and inside the
+// cross-site HTTPS iframe used by the v0 preview. A cross-site iframe only sends
+// cookies marked `SameSite=None; Secure`; over HTTPS we must use those, otherwise
+// the browser drops the session cookie and every admin request 401s right after
+// login (the "enter the panel then instantly bounce back" symptom). On plain HTTP
+// localhost, `Secure` cookies are rejected, so fall back to `SameSite=Lax`.
+function sessionCookieOptions(req: Request) {
+  const isHttps = req.secure || req.headers["x-forwarded-proto"] === "https";
+  return {
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: (isHttps ? "none" : "lax") as "none" | "lax",
+    path: "/",
+    maxAge: 1000 * 60 * 60 * 12 // 12 hours
+  };
+}
 
 // Security Middlewares
 app.use(
@@ -544,14 +569,9 @@ app.post("/api/admin/login", authLimiter, async (req: Request, res: Response, ne
 
     const token = createSessionToken(verifiedUser.username, verifiedUser.role || "admin");
 
-    // Secure HttpOnly Cookie (Strict, HttpOnly, SameSite)
-    res.cookie("dr_tecno_session", token, {
-      httpOnly: true,
-      secure: env.isProduction,
-      sameSite: env.isProduction ? "strict" : "lax",
-      path: "/",
-      maxAge: 1000 * 60 * 60 * 12 // 12 hours
-    });
+    // HttpOnly session cookie. Attributes adapt to the request protocol so the
+    // cookie survives inside the cross-site HTTPS iframe used by the preview.
+    res.cookie("dr_tecno_session", token, sessionCookieOptions(req));
 
     // Log admin login event
     await db.createAdminAuditLog({
@@ -575,7 +595,8 @@ app.post("/api/admin/login", authLimiter, async (req: Request, res: Response, ne
 
 // Admin Logout
 app.post("/api/admin/logout", (req: Request, res: Response) => {
-  res.clearCookie("dr_tecno_session", { path: "/" });
+  const { maxAge, ...clearOpts } = sessionCookieOptions(req);
+  res.clearCookie("dr_tecno_session", clearOpts);
   res.json({ success: true, message: "Sesión cerrada correctamente" });
 });
 
@@ -589,7 +610,8 @@ app.get("/api/admin/session", (req: AuthenticatedRequest, res: Response) => {
 
   const session = verifySessionToken(token);
   if (!session) {
-    res.clearCookie("dr_tecno_session", { path: "/" });
+    const { maxAge, ...clearOpts } = sessionCookieOptions(req);
+    res.clearCookie("dr_tecno_session", clearOpts);
     return res.status(401).json({ success: false, error: { code: "SESSION_EXPIRED", message: "Sesión expirada" } });
   }
 
@@ -918,9 +940,34 @@ app.use(errorHandler);
 async function startServer() {
   await initDb();
 
+  // Explicit HTTP server so Vite's HMR websocket can share the same port.
+  const httpServer = http.createServer(app);
+
   if (process.env.NODE_ENV !== "production") {
+    // Import Vite lazily so it is never pulled into the serverless/production
+    // bundle (Vite is a devDependency and would bloat or break the Vercel
+    // function). This branch only runs in local development.
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        // Attach HMR to the shared HTTP server instead of Vite's default
+        // standalone ws port (24678), which the v0/Vercel proxy does not
+        // expose. `clientPort: 443` tells the browser to reach the HMR socket
+        // through the proxy over wss:443, fixing "WebSocket closed without
+        // opened". Falls back to the same port for plain local dev.
+        hmr: {
+          server: httpServer,
+          clientPort: Number(process.env.HMR_CLIENT_PORT) || 443
+        },
+        // The hosting platform re-syncs env files (.env.development.local) at
+        // runtime. Without ignoring them, Vite restarts the server on every
+        // sync, which collides with the still-bound port (EADDRINUSE) and can
+        // crash the process before the preview attaches.
+        watch: {
+          ignored: ["**/.env", "**/.env.*"]
+        }
+      },
       appType: "spa"
     });
     app.use(vite.middlewares);
@@ -932,9 +979,70 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 [Dr Tecno Production Server] listening on http://localhost:${PORT}`);
+  // Close cleanly on shutdown signals so the port is released immediately.
+  // The v0/Vercel preview supervisor relaunches the dev server whenever files
+  // sync; if this process holds the port while the next one boots, the new
+  // instance crashes with EADDRINUSE. Releasing the socket promptly avoids that.
+  const shutdown = () => {
+    httpServer.close(() => process.exit(0));
+    // Safety net: force exit if close() hangs on open connections.
+    setTimeout(() => process.exit(0), 2000).unref();
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
+
+  // When the preview supervisor relaunches the dev server, the previous
+  // instance can keep holding the port (it doesn't always receive a shutdown
+  // signal). If we merely retried, the stale process would keep serving OLD
+  // code and this newcomer would eventually give up. Instead, the newcomer
+  // TAKES OVER: on EADDRINUSE it kills whatever process is holding the port
+  // (never itself) and binds. Dev-only; production uses a single serverless
+  // invocation and never reaches this branch.
+  const killStalePortHolder = () => {
+    const self = process.pid;
+    try {
+      // `ss -ltnp` lists listening sockets with their owning pid.
+      const out = execSync(`ss -ltnp 'sport = :${PORT}' 2>/dev/null || true`, {
+        encoding: "utf8"
+      });
+      const pids = new Set<number>();
+      for (const m of out.matchAll(/pid=(\d+)/g)) {
+        const pid = Number(m[1]);
+        if (pid && pid !== self) pids.add(pid);
+      }
+      for (const pid of pids) {
+        console.warn(`[STARTUP] Killing stale process ${pid} holding port ${PORT}`);
+        try { process.kill(pid, "SIGKILL"); } catch { /* already gone */ }
+      }
+      return pids.size > 0;
+    } catch {
+      return false;
+    }
+  };
+
+  let attempts = 0;
+  const MAX_ATTEMPTS = 15;
+  const listen = () => {
+    httpServer.listen(PORT, "0.0.0.0");
+  };
+  httpServer.on("listening", () => {
+    console.log(`[STARTUP] Server running on 0.0.0.0:${PORT}`);
   });
+  httpServer.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE" && attempts < MAX_ATTEMPTS) {
+      attempts++;
+      const killed = killStalePortHolder();
+      console.warn(
+        `[STARTUP] Port ${PORT} busy (attempt ${attempts}/${MAX_ATTEMPTS})` +
+          `${killed ? " — killed stale holder," : ","} retrying in 500ms...`
+      );
+      setTimeout(listen, 500);
+    } else {
+      console.error(`[STARTUP] Failed to bind port ${PORT}:`, err.message);
+      process.exit(1);
+    }
+  });
+  listen();
 }
 
 // In standard Node / container environments, start server immediately

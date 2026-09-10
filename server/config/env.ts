@@ -1,8 +1,13 @@
 import dotenv from "dotenv";
 import path from "path";
 
-// Load local environment files if present
+// Load local environment files if present.
+// Order matters: dotenv does NOT override variables already set in process.env,
+// so we load the most specific files first. `.env.development.local` is where
+// the hosting platform (v0 preview / Vercel) mirrors project + integration vars.
+dotenv.config({ path: path.resolve(process.cwd(), ".env.development.local") });
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+dotenv.config({ path: path.resolve(process.cwd(), ".env.development") });
 dotenv.config();
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -33,7 +38,30 @@ function resolveAppUrl(): string {
   return "http://localhost:3000";
 }
 
+// Extract the Supabase project ref from a service-role/anon JWT (`ref` claim).
+// Returns null for non-JWT keys (e.g. the new `sb_secret_...` format).
+function projectRefFromJwt(key?: string): string | null {
+  if (!key || !key.startsWith("eyJ")) return null;
+  try {
+    const payload = JSON.parse(
+      Buffer.from(key.split(".")[1], "base64").toString("utf8")
+    );
+    return typeof payload.ref === "string" ? payload.ref : null;
+  } catch {
+    return null;
+  }
+}
+
 function resolveSupabaseUrl(): string {
+  // The project's env vars contain URLs and keys from MORE THAN ONE Supabase
+  // project. If we pick a URL that doesn't match the key we authenticate with,
+  // Supabase returns "Invalid API key". To guarantee they match, derive the URL
+  // from the active service-role key's own `ref` claim whenever possible.
+  const ref = projectRefFromJwt(resolveServiceRoleKey());
+  if (ref) {
+    return `https://${ref}.supabase.co`;
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
     process.env.VITE_SUPABASE_URL ||
@@ -66,7 +94,7 @@ function resolveAdminSecret(): string {
 
 export const env: EnvConfig = {
   NODE_ENV: (process.env.NODE_ENV as any) || "development",
-  PORT: 3000,
+  PORT: Number(process.env.PORT) || 3000,
   APP_URL: resolveAppUrl(),
   SUPABASE_URL: resolveSupabaseUrl(),
   SUPABASE_SERVICE_ROLE_KEY: resolveServiceRoleKey(),

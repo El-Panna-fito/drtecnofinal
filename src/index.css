@@ -1,19 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700;800&family=Russo+One&family=Orbitron:wght@400;500;700;900&family=Roboto+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
-@font-face {
-  font-family: 'Ode to Idle Gaming';
-  src: url('https://db.onlinewebfonts.com/t/2c7d91e847702a4bf732dfccb6d85ebf.woff2') format('woff2'),
-       url('https://db.onlinewebfonts.com/t/2c7d91e847702a4bf732dfccb6d85ebf.woff') format('woff'),
-       url('https://db.onlinewebfonts.com/t/2c7d91e847702a4bf732dfccb6d85ebf.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
 @theme {
   --font-sans: "Gotham", "Montserrat", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Ode to Idle Gaming", "Russo One", "Orbitron", "Roboto Mono", monospace;
+  --font-serif: "Russo One", "Orbitron", "Roboto Mono", monospace;
   --font-mono: "Roboto Mono", ui-monospace, SFMono-Regular, monospace;
 
   --color-logo-pink: #ED4E9D;
