@@ -1,5 +1,11 @@
-import { GoogleGenAI } from "@google/genai";
+import { generateObject } from "ai";
+import { z } from "zod";
 import { Product, ServiceRequest } from "../../src/types.js";
+
+// AI generation runs through the Vercel AI Gateway (zero-config auth in the v0
+// preview and on Vercel). Using a plain gateway model id avoids depending on a
+// provider API key. The previously configured Gemini key was denied access.
+const AI_MODEL = "google/gemini-2.5-flash";
 
 export interface ChatMessage {
   sender: "bot" | "user";
@@ -163,13 +169,13 @@ function fallbackSemanticSearch(query: string, products: Product[]): { reply: st
     reply = "Aceptamos todas las tarjetas de crédito y débito a través de **Mercado Pago**, transferencia bancaria directa (con un **10% de descuento automático**) y efectivo contra entrega en nuestra sucursal de Paraná. 💳⚡";
     quickReplies = ["¿Hacen envíos?", "Ver catálogo", "Garantía"];
   } else if (isShipping) {
-    reply = "¡Hacemos envíos express a toda la Argentina! 🚚 En CABA y GBA entregamos en 24hs hábiles. Para el resto de las provincias enviamos por Correo Argentino con código de seguimiento en tiempo real.";
+    reply = "¡Hacemos envíos a todo el país! 🚚 Despachamos por Correo Argentino con código de seguimiento, o podés retirar sin cargo en nuestra sucursal de Paraná.";
     quickReplies = ["Medios de pago", "Ver catálogo", "Sucursal física"];
   } else if (isLocation) {
     reply = "Nuestro laboratorio central y tienda física está ubicada en **Gualeguaychú 595, Paraná, Entre Ríos**. Atendemos de lunes a viernes de 09:00 a 18:00 hs y sábados de 09:00 a 13:00 hs. 📍";
     quickReplies = ["Servicio Técnico", "¿Hacen envíos?", "Ver productos"];
   } else if (isWarranty) {
-    reply = "Todos nuestros productos cuentan con **12 meses de Garantía Oficial Escrita** y 10 días de cambio directo ante cualquier falla de fábrica. ¡Comprá con total tranquilidad! 🛡️";
+    reply = "Todas nuestras ventas y reparaciones cuentan con **garantía escrita de 30 días**. Priorizamos repuestos originales, sobre todo en la alta gama, y en el resto usamos alternativos de calidad probados. 🛡️";
     quickReplies = ["Medios de pago", "Envíos a todo el país", "Ver catálogo"];
   } else if (isService) {
     reply = "Contamos con laboratorio propio de alta precisión para celulares y computadoras. Podés registrar tu solicitud online en **Servicio Técnico**, seguir tu ticket en tiempo real o traer tu equipo a **Gualeguaychú 595, Paraná**.";
@@ -241,13 +247,13 @@ export function parseServiceMetadata(internalNotes: string | null | undefined) {
 export async function processChatQuery(params: {
   message: string;
   history?: ChatMessage[];
-  aiClient: GoogleGenAI | null;
+  aiEnabled: boolean;
   db: {
     getProducts: (filters?: any) => Promise<Product[]>;
     getServiceRequestByNumber?: (ticket: string) => Promise<ServiceRequest | null>;
   };
 }): Promise<ChatResult> {
-  const { message, history = [], aiClient, db } = params;
+  const { message, history = [], aiEnabled, db } = params;
   const cleanMessage = message.trim();
 
   // 1. Check for Service Ticket query pattern (e.g. TEC-1001, TEC-77908)
@@ -301,8 +307,8 @@ export async function processChatQuery(params: {
   // 2. Fetch Active Products Catalog
   const allProducts = await db.getProducts({ includeInactive: false });
 
-  // 3. If Gemini is available, use Gemini 3.7 Flash for deep semantic understanding and product guidance
-  if (aiClient) {
+  // 3. If AI is available, use the gateway model for deep semantic understanding and product guidance
+  if (aiEnabled) {
     try {
       const catalogSummary = allProducts.map(p => ({
         id: p.id,
@@ -329,8 +335,8 @@ REGLAS ESENCIALES DE ASISTENCIA:
 3. TONO CORDIAL Y PROFESIONAL: Responde en español rioplatense neutro y amigable (ej: "¡Hola!", "¡Claro!", "Te recomiendo..."). Explica brevemente por qué esos productos son ideales, destaca especificaciones importantes (temperatura, precisión, compatibilidad, etc.) y haz preguntas de seguimiento si es necesario para definir.
 4. INFORMACIÓN DE LA TIENDA:
    - Pagos: Mercado Pago (todas las tarjetas de crédito y débito), Transferencia bancaria directa (con 10% de descuento automático), efectivo en sucursal.
-   - Envíos: Envíos express a todo el país (CABA/GBA 24hs, Interior por Correo Argentino).
-   - Garantía: 12 meses de garantía oficial escrita en todos los productos, 10 días de cambio directo.
+   - Envíos: Envíos a todo el país por Correo Argentino con seguimiento, o retiro sin cargo en la sucursal.
+   - Garantía: 30 días de garantía escrita. Se priorizan repuestos originales (sobre todo en la alta gama) y se usan alternativos de calidad probados en el resto; no todo es original.
    - Sucursal: Gualeguaychú 595, Paraná, Entre Ríos.
    - Servicio técnico: Trazabilidad en tiempo real con código de ticket TEC-XXXXX.
    - Quiz inteligente: Recomendador personalizado en la web (/quiz).
@@ -352,20 +358,19 @@ Mensaje actual del cliente:
 
 Analiza la consulta y genera la mejor recomendación técnica guiada.`;
 
-      const response = await aiClient.models.generateContent({
-        model: "gemini-3.7-flash",
-        contents: userPrompt,
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json"
-        }
+      const { object: parsed } = await generateObject({
+        model: AI_MODEL,
+        schema: z.object({
+          reply: z.string(),
+          recommendedProductSlugs: z.array(z.string()),
+          quickReplies: z.array(z.string())
+        }),
+        system: systemInstruction,
+        prompt: userPrompt
       });
 
-      const responseText = response.text || "{}";
-      const parsed = JSON.parse(responseText);
-
-      const recommendedSlugs: string[] = Array.isArray(parsed.recommendedProductSlugs) 
-        ? parsed.recommendedProductSlugs 
+      const recommendedSlugs: string[] = Array.isArray(parsed.recommendedProductSlugs)
+        ? parsed.recommendedProductSlugs
         : [];
 
       // Hydrate recommended products from full database objects
