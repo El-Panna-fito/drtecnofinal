@@ -410,7 +410,7 @@ Analiza la consulta y genera la mejor recomendación técnica guiada.`;
       };
 
     } catch (aiErr) {
-      console.error("Gemini Assistant error, executing semantic fallback:", aiErr);
+      console.error("[v0] AI chat generation failed, executing semantic fallback:", aiErr instanceof Error ? aiErr.message : aiErr);
     }
   }
 
