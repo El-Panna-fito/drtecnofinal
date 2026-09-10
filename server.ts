@@ -978,9 +978,39 @@ async function startServer() {
     });
   }
 
-  httpServer.listen(PORT, "0.0.0.0", () => {
+  // Close cleanly on shutdown signals so the port is released immediately.
+  // The v0/Vercel preview supervisor relaunches the dev server whenever files
+  // sync; if this process holds the port while the next one boots, the new
+  // instance crashes with EADDRINUSE. Releasing the socket promptly avoids that.
+  const shutdown = () => {
+    httpServer.close(() => process.exit(0));
+    // Safety net: force exit if close() hangs on open connections.
+    setTimeout(() => process.exit(0), 2000).unref();
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
+
+  // If the previous instance hasn't freed the port yet, retry a few times
+  // instead of throwing an unhandled 'error' event and crashing the process.
+  let attempts = 0;
+  const MAX_ATTEMPTS = 10;
+  const listen = () => {
+    httpServer.listen(PORT, "0.0.0.0");
+  };
+  httpServer.on("listening", () => {
     console.log(`[STARTUP] Server running on 0.0.0.0:${PORT}`);
   });
+  httpServer.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE" && attempts < MAX_ATTEMPTS) {
+      attempts++;
+      console.warn(`[STARTUP] Port ${PORT} busy (attempt ${attempts}/${MAX_ATTEMPTS}); retrying in 500ms...`);
+      setTimeout(listen, 500);
+    } else {
+      console.error(`[STARTUP] Failed to bind port ${PORT}:`, err.message);
+      process.exit(1);
+    }
+  });
+  listen();
 }
 
 // In standard Node / container environments, start server immediately
