@@ -86,7 +86,7 @@ export const ServicioTecnicoPage: React.FC = () => {
 
   const faqData = [
     { q: "¿Cuánto tiempo demora el diagnóstico de mi equipo?", a: "El diagnóstico inicial es totalmente gratuito y demora entre 24 y 48 horas hábiles. Una vez finalizado, te enviamos el presupuesto detallado por correo o WhatsApp." },
-    { q: "¿Los repuestos que utilizan son originales?", a: "Sí, en Dr Tecno trabajamos exclusivamente con módulos y componentes originales de marcas oficiales. Todas nuestras reparaciones cuentan con repuestos certificados." },
+    { q: "¿Los repuestos que utilizan son originales?", a: "En su mayoría sí. Priorizamos repuestos originales, sobre todo en equipos de alta gama. En el resto de los casos utilizamos alternativos de calidad: no son originales, pero funcionan muy bien y los probamos antes de instalarlos." },
     { q: "¿Qué garantía tienen las reparaciones?", a: "Todas nuestras intervenciones de hardware (cambio de pantallas, baterías, soldadura microelectrónica) cuentan con una garantía escrita oficial de 3 meses." },
     { q: "¿Tengo que sacar un turno previo para llevar mi dispositivo?", a: "No es estrictamente necesario, podés traer tu equipo directamente a nuestro laboratorio central de Lunes a Sábados de 09:00 a 20:00 hs. No obstante, registrando la solicitud online agilizás el ingreso en mesa." }
   ];
@@ -200,7 +200,7 @@ export const ServicioTecnicoPage: React.FC = () => {
         <span className="text-[10px] font-serif uppercase tracking-widest text-logo-pink font-bold">Soporte Técnico</span>
         <h1 className="font-serif text-3xl sm:text-4xl font-bold text-foreground">Laboratorio Dr Tecno</h1>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Reparaciones de celulares, laptops y consolas con repuestos 100% originales, diagnóstico sin cargo en 24 horas y garantía oficial certificada.
+          Reparaciones de celulares, laptops y consolas con repuestos originales y alternativos de calidad, diagnóstico sin cargo en 24 horas y garantía oficial certificada.
         </p>
       </div>
 
