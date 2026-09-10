@@ -385,9 +385,9 @@ export const HomePage: React.FC = () => {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[
             { title: "Recomendaciones Inteligentes", text: "Olvidate de las especificaciones complejas. El Asistente de Recomendaciones te guía de inmediato al producto ideal según tus requisitos.", icon: Zap },
-            { title: "Productos Actualizados", text: "Solo comercializamos hardware original de última generación. Todo nuestro catálogo cuenta con el sello oficial de fábrica.", icon: Award },
-            { title: "Envío Express", text: "Envíos veloces y protegidos en menos de 24 horas hábiles a CABA y GBA, y despacho rápido a todo el interior del país.", icon: Truck },
-            { title: "Garantía Oficial", text: "Seguridad ante todo. Tu compra cuenta con cobertura legal y garantía escrita certificada por 12 meses directamente con nosotros.", icon: ShieldCheck },
+    { title: "Productos y Repuestos", text: "Priorizamos componentes originales, sobre todo en la alta gama. En el resto usamos alternativos de calidad que probamos antes de instalar y funcionan muy bien.", icon: Award },
+    { title: "Envíos a Todo el País", text: "Estamos en Paraná, Entre Ríos. Coordinamos envíos rápidos y protegidos a todo el país, o podés retirar en nuestro local.", icon: Truck },
+    { title: "Garantía Escrita", text: "Tu compra y cada reparación cuentan con garantía escrita de 30 días directamente con nosotros.", icon: ShieldCheck },
             { title: "Soporte Técnico Especializado", text: "Servicio de mantenimiento, cambio de módulos y optimización de dispositivos con laboratorio propio de alta tecnología.", icon: Headphones },
             { title: "Devolución Fácil", text: "Queremos que quedes 100% satisfecho. Si tu compra experimenta fallas dentro de los primeros 10 días, realizamos el cambio directo.", icon: RotateCcw },
           ].map((benefit, index) => {

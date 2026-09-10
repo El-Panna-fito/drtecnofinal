@@ -412,7 +412,7 @@ export const CheckoutPage: React.FC = () => {
 
           <div className="p-3 bg-muted/40 border border-border/30 rounded-lg text-[10px] text-muted-foreground flex gap-1.5 leading-relaxed">
             <ShieldCheck className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-            <p>Tus compras están totalmente protegidas por nuestra política de garantía certificada escrita de 12 meses.</p>
+            <p>Tus compras están totalmente protegidas por nuestra política de garantía escrita de 30 días.</p>
           </div>
         </aside>
 

@@ -249,15 +249,15 @@ export const ProductDetallePage: React.FC<ProductDetalleProps> = ({ slug }) => {
             <div className="flex items-start gap-2 text-muted-foreground">
               <ShieldCheck className="w-5 h-5 text-accent shrink-0" />
               <div>
-                <p className="font-semibold text-foreground">12 Meses de Garantía</p>
-                <p className="text-[10px] mt-0.5">Escrita oficial de Dr Tecno.</p>
+                <p className="font-semibold text-foreground">30 Días de Garantía</p>
+                <p className="text-[10px] mt-0.5">Garantía escrita de Dr Tecno.</p>
               </div>
             </div>
             <div className="flex items-start gap-2 text-muted-foreground">
               <Truck className="w-5 h-5 text-accent shrink-0" />
               <div>
-                <p className="font-semibold text-foreground">Envío Gratis Express</p>
-                <p className="text-[10px] mt-0.5">En CABA y GBA en 24 horas.</p>
+                <p className="font-semibold text-foreground">Envíos a Todo el País</p>
+                <p className="text-[10px] mt-0.5">O retiro sin cargo en Paraná.</p>
               </div>
             </div>
             <div className="flex items-start gap-2 text-muted-foreground">
@@ -326,7 +326,7 @@ export const ProductDetallePage: React.FC<ProductDetalleProps> = ({ slug }) => {
                   <span>Métodos de Envío y Despachos</span>
                 </h4>
                 <p>
-                  Todas las compras son procesadas de inmediato en nuestra base de datos segura de Supabase. Si te encontrás en la Ciudad Autónoma de Buenos Aires (CABA) o Gran Buenos Aires (GBA), tu pedido se despacha mediante nuestra flota propia en menos de 24 horas hábiles.
+                  Todas las compras son procesadas de inmediato en nuestra base de datos segura. Estamos en Paraná, Entre Ríos: podés retirar tu pedido sin cargo en nuestro local de Gualeguaychú 595, o te lo despachamos a todo el país.
                 </p>
                 <p>
                   Para envíos al interior del país, enviamos por Correo Argentino o Andreani en un plazo de 3 a 5 días hábiles. Al momento de despachar, recibirás un correo automatizado con el código de seguimiento de tu pedido.
@@ -339,10 +339,10 @@ export const ProductDetallePage: React.FC<ProductDetalleProps> = ({ slug }) => {
                   <span>Cobertura y Soporte Técnico</span>
                 </h4>
                 <p>
-                  En Dr Tecno cuidamos tu inversión. Todos nuestros equipos son nuevos de origen, con embalaje original y sellados de fábrica. Contamos con laboratorio oficial propio, lo que agiliza cualquier proceso de soporte o diagnóstico técnico directo.
+                  En Dr Tecno cuidamos tu inversión. Priorizamos componentes originales, sobre todo en la alta gama, y en el resto usamos alternativos de calidad probados. Contamos con laboratorio propio, lo que agiliza cualquier proceso de soporte o diagnóstico técnico directo.
                 </p>
                 <p>
-                  Para hacer valer la garantía de 12 meses, simplemente ponete en contacto a través de nuestro Chat Widget flotante, vía WhatsApp con el número de factura, o ingresando una solicitud en la pestaña de 'Servicio Técnico'.
+                  Para hacer valer la garantía de 30 días, simplemente ponete en contacto a través de nuestro Chat Widget flotante, vía WhatsApp con el número de factura, o ingresando una solicitud en la pestaña de 'Servicio Técnico'.
                 </p>
               </div>
             </div>
