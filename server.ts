@@ -6,7 +6,8 @@ import path from "path";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { GoogleGenAI } from "@google/genai";
+import { generateObject } from "ai";
+import { z } from "zod";
 
 import { env, validateEnv } from "./server/config/env.js";
 import { db, initDb } from "./server/db.js";
@@ -96,21 +97,11 @@ app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(cookieParser(env.ADMIN_SESSION_SECRET));
 
-// Lazy-initialized Gemini AI client for tech support & diagnostics
-let geminiClient: GoogleGenAI | null = null;
-function getGemini(): GoogleGenAI | null {
-  if (!geminiClient && env.GEMINI_API_KEY) {
-    geminiClient = new GoogleGenAI({ 
-      apiKey: env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
-  }
-  return geminiClient;
-}
+// AI runs through the Vercel AI Gateway (zero-config auth in the v0 preview and
+// on Vercel via OIDC). A plain gateway model id is used so no provider API key
+// is required — the previously configured Gemini key was denied project access.
+const AI_MODEL = "google/gemini-2.5-flash";
+const AI_ENABLED = !!(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN);
 
 // ==================== PUBLIC API ROUTES ====================
 
@@ -473,15 +464,16 @@ app.post("/api/mercadopago/webhook", webhookLimiter, async (req: Request, res: R
 app.post("/api/ai/diagnose", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { deviceType, brand, model, problemDescription, symptoms } = req.body;
-    const ai = getGemini();
 
-    if (!ai) {
-      return res.json({
-        diagnosis: "Diagnóstico preliminar basado en manual técnico.",
-        possibleCauses: ["Falla en el circuito de alimentación", "Batería degradada", "Componente en corto"],
-        recommendedAction: "Acercar el equipo al laboratorio para medición con fuente y cámara térmica.",
-        estimatedTime: "24 a 48 hs hábiles"
-      });
+    const fallbackDiagnosis = {
+      diagnosis: "Diagnóstico preliminar basado en manual técnico.",
+      possibleCauses: ["Falla en el circuito de alimentación", "Batería degradada", "Componente en corto"],
+      recommendedAction: "Acercar el equipo al laboratorio para medición con fuente y cámara térmica.",
+      estimatedTime: "24 a 48 hs hábiles"
+    };
+
+    if (!AI_ENABLED) {
+      return res.json(fallbackDiagnosis);
     }
 
     const prompt = `Actúa como el jefe técnico especialista en microelectrónica y reparación de celulares y computadoras de 'Dr Tecno'.
@@ -501,15 +493,24 @@ Devuelve un JSON estrictamente válido con la siguiente estructura:
   "tip": "Consejo de seguridad para el cliente (ej. no intentar forzar la carga)"
 }`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
-      contents: prompt,
-      config: { responseMimeType: "application/json" }
-    });
-
-    const text = response.text || "{}";
-    const parsed = JSON.parse(text);
-    res.json(parsed);
+    try {
+      const { object } = await generateObject({
+        model: AI_MODEL,
+        schema: z.object({
+          diagnosis: z.string(),
+          possibleCauses: z.array(z.string()),
+          recommendedAction: z.string(),
+          estimatedTime: z.string(),
+          difficulty: z.string(),
+          tip: z.string()
+        }),
+        prompt
+      });
+      res.json(object);
+    } catch (aiErr) {
+      console.error("AI diagnose error, returning fallback:", aiErr);
+      res.json(fallbackDiagnosis);
+    }
   } catch (err) {
     next(err);
   }
@@ -523,11 +524,10 @@ app.post("/api/chat", async (req: Request, res: Response, next: NextFunction) =>
       return res.status(400).json({ error: "El campo 'message' es requerido." });
     }
 
-    const ai = getGemini();
     const result = await processChatQuery({
       message,
       history: Array.isArray(history) ? history : [],
-      aiClient: ai,
+      aiEnabled: AI_ENABLED,
       db: {
         getProducts: (filters) => db.getProducts(filters),
         getServiceRequestByNumber: (ticket) => db.getServiceRequestByNumber(ticket)
